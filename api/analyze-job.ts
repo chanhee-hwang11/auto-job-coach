@@ -180,7 +180,15 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { jobText } = req.body || {};
+  let parsedBody = req.body;
+  if (typeof parsedBody === 'string') {
+    try {
+      parsedBody = JSON.parse(parsedBody);
+    } catch {
+      parsedBody = {};
+    }
+  }
+  const { jobText } = parsedBody || {};
   if (!jobText || typeof jobText !== 'string' || jobText.trim().length === 0) {
     return res.status(400).json({ error: '채용공고 텍스트를 입력해 주세요.' });
   }

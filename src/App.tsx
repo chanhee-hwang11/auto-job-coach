@@ -16,6 +16,7 @@ import {
   analyzeJobClientSide,
   diagnoseCompetencyClientSide,
 } from './utils/mobilityAnalyzer';
+import { safeFetchJson } from './utils/apiClient';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { JobAnalysisView } from './components/JobAnalysisView';
@@ -83,23 +84,18 @@ export default function App() {
     setCurrentTab('jobAnalysis');
     try {
       showToast('자동차 부품 품질관리 예시 채용공고를 분석 중입니다...', 'info');
-      const response = await fetch('/api/analyze-job', {
+      const apiRes = await safeFetchJson<JobAnalysisResult>('/api/analyze-job', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobText: SAMPLE_JOB_POSTING }),
       });
-      const contentType = response.headers.get('content-type') || '';
-      if (response.ok && contentType.includes('application/json')) {
-        const json = await response.json();
-        if (json.success && json.data) {
-          setJobAnalysis(json.data);
-          setOriginalJobText(SAMPLE_JOB_POSTING);
-          setTargetJobText(`[${json.data.companyName}] ${json.data.jobTitle}`);
-          showToast('예시 공고 분석이 완료되었습니다!', 'success');
-          return;
-        }
+      if (apiRes.ok && apiRes.data) {
+        setJobAnalysis(apiRes.data);
+        setOriginalJobText(SAMPLE_JOB_POSTING);
+        setTargetJobText(`[${apiRes.data.companyName}] ${apiRes.data.jobTitle}`);
+        showToast('예시 공고 분석이 완료되었습니다!', 'success');
+        return;
       }
-      throw new Error('Vercel/Static mode fallback');
+      throw new Error(apiRes.error || 'Vercel fallback');
     } catch (_err) {
       // Seamless client-side engine (Guarantees it always works on Vercel/GitHub!)
       const clientData = analyzeJobClientSide(SAMPLE_JOB_POSTING);
@@ -120,24 +116,22 @@ export default function App() {
         ? `[분석된 공고] ${jobAnalysis.companyName} ${jobAnalysis.jobTitle}`
         : SAMPLE_USER_PROFILE.targetJob;
 
-      const response = await fetch('/api/diagnose-competency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userProfile: SAMPLE_USER_PROFILE,
-          targetJobContext,
-        }),
-      });
-      const contentType = response.headers.get('content-type') || '';
-      if (response.ok && contentType.includes('application/json')) {
-        const json = await response.json();
-        if (json.success && json.data) {
-          setCompetencyDiagnosis(json.data);
-          showToast('역량 진단 분석이 완료되었습니다!', 'success');
-          return;
+      const apiRes = await safeFetchJson<CompetencyDiagnosisResult>(
+        '/api/diagnose-competency',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            userProfile: SAMPLE_USER_PROFILE,
+            targetJobContext,
+          }),
         }
+      );
+      if (apiRes.ok && apiRes.data) {
+        setCompetencyDiagnosis(apiRes.data);
+        showToast('역량 진단 분석이 완료되었습니다!', 'success');
+        return;
       }
-      throw new Error('Vercel/Static mode fallback');
+      throw new Error(apiRes.error || 'Vercel fallback');
     } catch (_err) {
       const clientData = diagnoseCompetencyClientSide(SAMPLE_USER_PROFILE);
       setCompetencyDiagnosis(clientData);

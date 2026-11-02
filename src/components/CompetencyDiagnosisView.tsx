@@ -6,6 +6,7 @@ import {
 } from '../types';
 import { SAMPLE_USER_PROFILE } from '../data/mockNews';
 import { diagnoseCompetencyClientSide } from '../utils/mobilityAnalyzer';
+import { safeFetchJson } from '../utils/apiClient';
 import {
   UserCheck,
   Sparkles,
@@ -97,28 +98,35 @@ export const CompetencyDiagnosisView: React.FC<CompetencyDiagnosisViewProps> = (
     }
 
     try {
+      const apiRes = await safeFetchJson<CompetencyDiagnosisResult>(
+        '/api/diagnose-competency',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            userProfile: formData,
+            targetJobContext,
+          }),
+        }
+      );
 
-      const response = await fetch('/api/diagnose-competency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userProfile: formData,
-          targetJobContext,
-        }),
-      });
+      if (apiRes.ok && apiRes.data) {
+        onDiagnosisSuccess(apiRes.data);
+        setErrorMessage(null);
+      } else {
+        console.warn(`[역량 진단 API 상태: HTTP ${apiRes.status}] ${apiRes.error || '백엔드 응답 대기'}. 스마트 역량 진단 엔진으로 전환합니다.`);
+        const clientData = diagnoseCompetencyClientSide(formData, targetJobContext);
+        onDiagnosisSuccess(clientData);
 
-      const contentType = response.headers.get('content-type') || '';
-      if (response.ok && contentType.includes('application/json')) {
-        const json = await response.json();
-        if (json.success && json.data) {
-          onDiagnosisSuccess(json.data);
-          return;
+        if (apiRes.status === 404) {
+          setErrorMessage('Vercel 배포 안내: /api 서버리스 경로를 찾을 수 없어 스마트 역량 진단 엔진이 가동되었습니다. (vercel.json 반영 후 재배포 시 실시간 AI가 활성화됩니다.)');
+        } else if (apiRes.status === 401) {
+          setErrorMessage('Gemini API 키 안내: Vercel 대시보드(Settings > Environment Variables)에 GEMINI_API_KEY를 등록해 주세요.');
+        } else if (apiRes.status === 429) {
+          setErrorMessage('API 호출 한도 안내: 요청 한도를 초과하여 대체 진단 엔진이 가동되었습니다. 잠시 후 재시도 가능합니다.');
         }
       }
-      throw new Error('API 서버 연결 또는 응답 형식 문제');
     } catch (err: any) {
-      console.warn('Backend API unavailable (Vercel/Static mode), applying client-side diagnosis engine:', err);
-      // Seamlessly analyze client-side so it NEVER fails on Vercel or GitHub!
+      console.warn('Unexpected diagnosis exception, applying client-side engine:', err.message);
       const clientData = diagnoseCompetencyClientSide(formData, targetJobContext);
       onDiagnosisSuccess(clientData);
     } finally {

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { JobAnalysisResult } from '../types';
 import { SAMPLE_JOB_POSTINGS } from '../data/mockNews';
 import { analyzeJobClientSide } from '../utils/mobilityAnalyzer';
+import { safeFetchJson } from '../utils/apiClient';
 import {
   FileSearch,
   Sparkles,
@@ -61,33 +62,36 @@ export const JobAnalysisView: React.FC<JobAnalysisViewProps> = ({
     setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/analyze-job', {
+      const apiRes = await safeFetchJson<JobAnalysisResult>('/api/analyze-job', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ jobText }),
       });
 
-      const contentType = response.headers.get('content-type') || '';
-      if (response.ok && contentType.includes('application/json')) {
-        const json = await response.json();
-        if (json.success && json.data) {
-          if (json.modelUsed) {
-            setModelBadge(json.modelUsed.includes('3.1') ? 'Gemini 3.1 Flash' : 'Gemini AI');
-          } else {
-            setModelBadge('모빌리티 직무 분석');
-          }
-          onAnalysisSuccess(json.data, jobText);
-          return;
+      if (apiRes.ok && apiRes.data) {
+        setModelBadge('Gemini 3.1 Flash');
+        onAnalysisSuccess(apiRes.data, jobText);
+        setErrorMessage(null);
+      } else {
+        // Handle error status cleanly without printing API keys or personal data
+        console.warn(`[AI 연결 상태 확인: HTTP ${apiRes.status}] ${apiRes.error || '백엔드 응답 대기'}. 스마트 직무 분석 엔진으로 전환합니다.`);
+        
+        // Seamlessly provide analysis
+        const clientData = analyzeJobClientSide(jobText);
+        setModelBadge('스마트 직무 분석 (배포 모드)');
+        onAnalysisSuccess(clientData, jobText);
+
+        if (apiRes.status === 404) {
+          setErrorMessage('Vercel 배포 안내: /api 서버리스 경로가 아직 연결되지 않아 스마트 직무 분석 엔진이 가동되었습니다. (vercel.json을 GitHub에 커밋 후 재배포하면 실시간 Gemini가 활성화됩니다.)');
+        } else if (apiRes.status === 401) {
+          setErrorMessage('Gemini API 키 안내: Vercel 대시보드(Settings > Environment Variables)에 GEMINI_API_KEY를 등록해 주세요.');
+        } else if (apiRes.status === 429) {
+          setErrorMessage('API 호출 한도 안내: 요청 한도를 초과하여 대체 분석 엔진이 가동되었습니다. 잠시 후 재시도 가능합니다.');
         }
       }
-      throw new Error('API 서버 연결 또는 응답 형식 문제');
     } catch (err: any) {
-      console.warn('Backend API unavailable (Vercel/Static mode), applying client-side engine:', err);
-      // Seamlessly analyze client-side so it NEVER fails on Vercel or GitHub!
+      console.warn('Unexpected error, applying client-side engine:', err.message);
       const clientData = analyzeJobClientSide(jobText);
-      setModelBadge('스마트 직무 분석 (Vercel 호환 모드)');
+      setModelBadge('스마트 직무 분석 (배포 모드)');
       onAnalysisSuccess(clientData, jobText);
     } finally {
       setIsLoading(false);
