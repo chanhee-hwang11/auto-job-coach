@@ -1,0 +1,6 @@
+{
+  "name": "MOBILITY CAREER AI",
+  "description": "모빌리티 산업(자동차·이차전지·전장·스마트팩토리) 취업 준비생을 위한 AI 맞춤형 채용공고 분석 및 역량 진단 플랫폼",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
