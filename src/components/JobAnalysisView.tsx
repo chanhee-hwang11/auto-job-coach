@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { JobAnalysisResult } from '../types';
 import { SAMPLE_JOB_POSTINGS } from '../data/mockNews';
+import { analyzeJobClientSide } from '../utils/mobilityAnalyzer';
 import {
   FileSearch,
   Sparkles,
@@ -68,29 +69,31 @@ export const JobAnalysisView: React.FC<JobAnalysisViewProps> = ({
         body: JSON.stringify({ jobText }),
       });
 
-      const json = await response.json();
-
-      if (!response.ok || !json.success) {
-        throw new Error(json.error || '채용공고 분석 요청 중 오류가 발생했습니다.');
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('application/json')) {
+        const json = await response.json();
+        if (json.success && json.data) {
+          if (json.modelUsed) {
+            setModelBadge(json.modelUsed.includes('3.1') ? 'Gemini 3.1 Flash' : 'Gemini AI');
+          } else {
+            setModelBadge('모빌리티 직무 분석');
+          }
+          onAnalysisSuccess(json.data, jobText);
+          return;
+        }
       }
-
-      if (json.modelUsed) {
-        setModelBadge(json.modelUsed.includes('3.1') ? 'Gemini 3.1 Flash' : 'Gemini AI');
-      }
-
-      onAnalysisSuccess(json.data, jobText);
-
-      // Smooth scroll to results
+      throw new Error('API 서버 연결 또는 응답 형식 문제');
+    } catch (err: any) {
+      console.warn('Backend API unavailable (Vercel/Static mode), applying client-side engine:', err);
+      // Seamlessly analyze client-side so it NEVER fails on Vercel or GitHub!
+      const clientData = analyzeJobClientSide(jobText);
+      setModelBadge('스마트 직무 분석 (Vercel 호환 모드)');
+      onAnalysisSuccess(clientData, jobText);
+    } finally {
+      setIsLoading(false);
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
-    } catch (err: any) {
-      console.error('Job analysis failed:', err);
-      setErrorMessage(
-        err.message || 'AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.'
-      );
-    } finally {
-      setIsLoading(false);
     }
   };
 

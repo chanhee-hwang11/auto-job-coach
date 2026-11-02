@@ -16,9 +16,15 @@ interface NavbarProps {
   currentTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
   targetJobText: string;
+  onOpenVercelGuide?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, targetJobText }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentTab,
+  onSelectTab,
+  targetJobText,
+  onOpenVercelGuide,
+}) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   const navItems: { id: NavigationTab; label: string; icon: React.ReactNode }[] = [
@@ -79,8 +85,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, targetJ
             })}
           </nav>
 
-          {/* Quick Target Job Indicator & Mobile Button */}
-          <div className="flex items-center space-x-3">
+          {/* Quick Target Job Indicator & Vercel Guide */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {onOpenVercelGuide && (
+              <button
+                onClick={onOpenVercelGuide}
+                className="hidden sm:inline-flex items-center space-x-1 text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-300 transition-colors"
+                title="Vercel & GitHub 배포 시 AI 연결 가이드"
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>Vercel 배포 안내</span>
+              </button>
+            )}
+
             {targetJobText ? (
               <div
                 onClick={() => onSelectTab('jobAnalysis')}
@@ -88,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, targetJ
                 title="목표 공고 분석 바로가기"
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span className="font-medium max-w-[150px] truncate">{targetJobText}</span>
+                <span className="font-medium max-w-[140px] truncate">{targetJobText}</span>
                 <ChevronRight className="w-3 h-3 text-slate-400" />
               </div>
             ) : (
